@@ -1,77 +1,62 @@
-import { View, FlatList, TouchableOpacity, Text, StyleSheet } from 'react-native';
+import {View, FlatList, TouchableOpacity, Text, StyleSheet, ActivityIndicator} from 'react-native';
 import { router } from 'expo-router';
-import { useState } from 'react';
-
-interface Chat {
-    id: string;
-    name: string;
-    lastMessage: string;
-    timestamp: string;
-    unreadCount: number;
-}
+import {useGetConversationsQuery} from "@/store/api/emailApi";
+import {Conversation} from "@/types/chat";
 
 export default function ChatsScreen() {
-    const [chats] = useState<Chat[]>([
-        {
-            id: '1',
-            name: 'Technical Support',
-            lastMessage: 'How can I help you today?',
-            timestamp: new Date().toISOString(),
-            unreadCount: 0,
-        },
-        {
-            id: '2',
-            name: 'Sales Department',
-            lastMessage: 'Thank you for your inquiry',
-            timestamp: new Date(Date.now() - 3600000).toISOString(),
-            unreadCount: 2,
-        },
-    ]);
+    const { data: conversations, isLoading } = useGetConversationsQuery('yourCompanyName');
 
-    const handleChatPress = (chatId: string) => {
+    const handleChatPress = (chatId: number) => {
         router.push({
             pathname: '/(app)/chats/[id]',
-            params: { id: chatId }
+            params: { id: chatId.toString() }
         });
     };
 
-    const renderChatItem = ({ item }: { item: Chat }) => (
-        <TouchableOpacity
-            style={styles.chatItem}
-            onPress={() => handleChatPress(item.id)}
-        >
-            <View style={styles.chatInfo}>
-                <View style={styles.chatHeader}>
-                    <Text style={styles.chatName}>{item.name}</Text>
-                    <Text style={styles.timestamp}>
-                        {new Date(item.timestamp).toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                        })}
-                    </Text>
-                </View>
-                <View style={styles.lastMessageContainer}>
-                    <Text style={styles.lastMessage} numberOfLines={1}>
-                        {item.lastMessage}
-                    </Text>
-                    {item.unreadCount > 0 && (
-                        <View style={styles.unreadBadge}>
-                            <Text style={styles.unreadCount}>
-                                {item.unreadCount}
-                            </Text>
-                        </View>
-                    )}
-                </View>
+    if (isLoading) {
+        return (
+            <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#f4511e" />
             </View>
-        </TouchableOpacity>
-    );
+        );
+    }
+
+    const renderChatItem = ({ item }: { item: Conversation }) => {
+        const lastMessage = item.messages && item.messages.length > 0
+            ? item.messages[item.messages.length - 1]
+            : null;
+
+        return (
+            <TouchableOpacity
+                style={styles.chatItem}
+                onPress={() => handleChatPress(item.id)}
+            >
+                <View style={styles.chatInfo}>
+                    <View style={styles.chatHeader}>
+                        <Text style={styles.chatName}>{item.subject}</Text>
+                        <Text style={styles.timestamp}>
+                            {new Date(item.lastUpdateDate).toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                            })}
+                        </Text>
+                    </View>
+                    <View style={styles.lastMessageContainer}>
+                        <Text style={styles.lastMessage} numberOfLines={1}>
+                            {lastMessage?.body}
+                        </Text>
+                    </View>
+                </View>
+            </TouchableOpacity>
+        );
+    };
 
     return (
         <View style={styles.container}>
             <FlatList
-                data={chats}
+                data={conversations}
                 renderItem={renderChatItem}
-                keyExtractor={item => item.id}
+                keyExtractor={item => item.id.toString()}
                 contentContainerStyle={styles.listContainer}
             />
         </View>
@@ -85,6 +70,12 @@ const styles = StyleSheet.create({
     },
     listContainer: {
         padding: 16,
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#fff',
     },
     chatItem: {
         paddingVertical: 12,

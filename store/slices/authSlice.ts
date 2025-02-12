@@ -9,7 +9,6 @@ const initialState: AuthState = {
     isLoading: true,
 };
 
-// Асинхронный thunk для инициализации auth state
 export const initializeAuth = createAsyncThunk(
     'auth/initialize',
     async () => {
@@ -33,7 +32,6 @@ const authSlice = createSlice({
             state.user = user;
             state.token = token;
             state.companyUrl = companyName;
-            // Сохраняем в AsyncStorage
             storage.setAuthData(token, user, companyName);
         },
         logout: (state) => {

@@ -17,7 +17,6 @@ export default function AppLayout() {
                     backgroundColor: '#f4511e',
                 },
                 headerTintColor: '#fff',
-                // Добавляем кнопку logout во все экраны
                 headerRight: () => <LogoutButton />,
             }}
         >
@@ -46,6 +45,7 @@ export default function AppLayout() {
                 name="bots"
                 options={{
                     title: 'All Bots',
+                    headerBackVisible: true,
                 }}
             />
             <Stack.Screen

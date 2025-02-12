@@ -16,7 +16,7 @@ export interface User {
     id: string;
     email: string;
     name: string;
-    token: string;
+    accessToken: string;
     companyUrl: string;
 }
 

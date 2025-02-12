@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -8,8 +8,12 @@ import {
     StyleSheet,
     Modal,
     ScrollView,
+    ActivityIndicator,
+    Alert,
 } from 'react-native';
-import { useColorScheme } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useGetEmailBotsQuery, useDeleteEmailBotMutation, useCreateEmailBotMutation } from '@/store/api/botsApi';
 
 interface Bot {
     id: string;
@@ -20,34 +24,86 @@ interface Bot {
     imapPort: number;
 }
 
-const mockBots: Bot[] = [
-    {
-        id: '1',
-        email: 'bot1@example.com',
-        smtpHost: 'smtp.example.com',
-        smtpPort: 587,
-        imapHost: 'imap.example.com',
-        imapPort: 993,
-    },
-    {
-        id: '2',
-        email: 'bot2@example.com',
-        smtpHost: 'smtp.example.com',
-        smtpPort: 587,
-        imapHost: 'imap.example.com',
-        imapPort: 993,
-    },
-];
-
 export default function BotsScreen() {
     const [modalVisible, setModalVisible] = useState(false);
-    const colorScheme = useColorScheme();
+    const [companyName, setCompanyName] = useState<string | null>(null);
+    const [formData, setFormData] = useState({
+        email: '',
+        password: '',
+        smtpHost: '',
+        smtpPort: '',
+        imapHost: '',
+        imapPort: '',
+    });
+
+    useEffect(() => {
+        AsyncStorage.getItem('company_name').then(name => {
+            if (name) setCompanyName(name);
+        });
+    }, []);
+
+    // RTK Query hooks
+    const { data: bots, isLoading, error } = useGetEmailBotsQuery(companyName ?? '', {
+        skip: !companyName,
+    });
+    const [deleteBot] = useDeleteEmailBotMutation();
+    const [createBot, { isLoading: isCreating }] = useCreateEmailBotMutation();
+
+    const handleDeleteBot = async (botId: string) => {
+        if (!companyName) return;
+
+        try {
+            await deleteBot({ companyName, id: botId }).unwrap();
+            Alert.alert('Success', 'Bot deleted successfully');
+        } catch (error) {
+            Alert.alert('Error', 'Failed to delete bot');
+        }
+    };
+
+    const handleCreateBot = async () => {
+        if (!companyName) return;
+
+        try {
+            const botData = {
+                email: formData.email,
+                password: formData.password,
+                smtpHost: formData.smtpHost,
+                smtpPort: parseInt(formData.smtpPort),
+                imapHost: formData.imapHost,
+                imapPort: parseInt(formData.imapPort),
+            };
+
+            await createBot({
+                companyName,
+                botData
+            }).unwrap();
+
+            setModalVisible(false);
+            setFormData({
+                email: '',
+                password: '',
+                smtpHost: '',
+                smtpPort: '',
+                imapHost: '',
+                imapPort: '',
+            });
+            Alert.alert('Success', 'Bot created successfully');
+        } catch (error) {
+            Alert.alert('Error', 'Failed to create bot');
+        }
+    };
 
     const renderBotItem = ({ item }: { item: Bot }) => (
         <View style={styles.botItem}>
             <View style={styles.botInfo}>
                 <View style={styles.botHeader}>
                     <Text style={styles.botEmail}>{item.email}</Text>
+                    <TouchableOpacity
+                        style={styles.deleteButton}
+                        onPress={() => handleDeleteBot(item.id)}
+                    >
+                        <Ionicons name="trash-outline" size={20} color="#f4511e" />
+                    </TouchableOpacity>
                 </View>
                 <View style={styles.botDetails}>
                     <Text style={styles.detailText}>
@@ -61,17 +117,41 @@ export default function BotsScreen() {
         </View>
     );
 
+    if (!companyName) {
+        return (
+            <View style={styles.centerContainer}>
+                <Text style={styles.errorText}>Company name not found</Text>
+            </View>
+        );
+    }
+
+    if (isLoading) {
+        return (
+            <View style={styles.centerContainer}>
+                <ActivityIndicator size="large" color="#f4511e" />
+            </View>
+        );
+    }
+
+    if (error) {
+        return (
+            <View style={styles.centerContainer}>
+                <Text style={styles.errorText}>Failed to load bots</Text>
+            </View>
+        );
+    }
+
     return (
         <View style={styles.container}>
             <TouchableOpacity
                 style={styles.addButton}
                 onPress={() => setModalVisible(true)}
             >
-                <Text style={styles.addButtonText}>+ Добавить бота</Text>
+                <Text style={styles.addButtonText}>+ Add Bot</Text>
             </TouchableOpacity>
 
             <FlatList
-                data={mockBots}
+                data={bots}
                 renderItem={renderBotItem}
                 keyExtractor={(item) => item.id}
                 contentContainerStyle={styles.listContainer}
@@ -85,68 +165,80 @@ export default function BotsScreen() {
                 <View style={styles.modalContainer}>
                     <View style={styles.modalContent}>
                         <ScrollView>
-                            <Text style={styles.modalTitle}>Новый бот</Text>
+                            <Text style={styles.modalTitle}>New Bot</Text>
 
                             <View style={styles.inputContainer}>
                                 <Text style={styles.inputLabel}>Email</Text>
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="Введите email"
+                                    placeholder="Enter email"
                                     placeholderTextColor="#666"
                                     autoCapitalize="none"
+                                    value={formData.email}
+                                    onChangeText={(text) => setFormData(prev => ({ ...prev, email: text }))}
                                 />
                             </View>
 
                             <View style={styles.inputContainer}>
-                                <Text style={styles.inputLabel}>Пароль</Text>
+                                <Text style={styles.inputLabel}>Password</Text>
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="Введите пароль"
+                                    placeholder="Enter password"
                                     placeholderTextColor="#666"
                                     secureTextEntry
+                                    value={formData.password}
+                                    onChangeText={(text) => setFormData(prev => ({ ...prev, password: text }))}
                                 />
                             </View>
 
                             <View style={styles.row}>
                                 <View style={[styles.inputContainer, styles.flex1, styles.marginRight]}>
-                                    <Text style={styles.inputLabel}>SMTP хост</Text>
+                                    <Text style={styles.inputLabel}>SMTP Host</Text>
                                     <TextInput
                                         style={styles.input}
                                         placeholder="smtp.example.com"
                                         placeholderTextColor="#666"
                                         autoCapitalize="none"
+                                        value={formData.smtpHost}
+                                        onChangeText={(text) => setFormData(prev => ({ ...prev, smtpHost: text }))}
                                     />
                                 </View>
 
                                 <View style={[styles.inputContainer, styles.flex1]}>
-                                    <Text style={styles.inputLabel}>SMTP порт</Text>
+                                    <Text style={styles.inputLabel}>SMTP Port</Text>
                                     <TextInput
                                         style={styles.input}
                                         placeholder="587"
                                         placeholderTextColor="#666"
                                         keyboardType="numeric"
+                                        value={formData.smtpPort}
+                                        onChangeText={(text) => setFormData(prev => ({ ...prev, smtpPort: text }))}
                                     />
                                 </View>
                             </View>
 
                             <View style={styles.row}>
                                 <View style={[styles.inputContainer, styles.flex1, styles.marginRight]}>
-                                    <Text style={styles.inputLabel}>IMAP хост</Text>
+                                    <Text style={styles.inputLabel}>IMAP Host</Text>
                                     <TextInput
                                         style={styles.input}
                                         placeholder="imap.example.com"
                                         placeholderTextColor="#666"
                                         autoCapitalize="none"
+                                        value={formData.imapHost}
+                                        onChangeText={(text) => setFormData(prev => ({ ...prev, imapHost: text }))}
                                     />
                                 </View>
 
                                 <View style={[styles.inputContainer, styles.flex1]}>
-                                    <Text style={styles.inputLabel}>IMAP порт</Text>
+                                    <Text style={styles.inputLabel}>IMAP Port</Text>
                                     <TextInput
                                         style={styles.input}
                                         placeholder="993"
                                         placeholderTextColor="#666"
                                         keyboardType="numeric"
+                                        value={formData.imapPort}
+                                        onChangeText={(text) => setFormData(prev => ({ ...prev, imapPort: text }))}
                                     />
                                 </View>
                             </View>
@@ -154,15 +246,31 @@ export default function BotsScreen() {
                             <View style={styles.modalButtons}>
                                 <TouchableOpacity
                                     style={[styles.button, styles.cancelButton]}
-                                    onPress={() => setModalVisible(false)}
+                                    onPress={() => {
+                                        setModalVisible(false);
+                                        setFormData({
+                                            email: '',
+                                            password: '',
+                                            smtpHost: '',
+                                            smtpPort: '',
+                                            imapHost: '',
+                                            imapPort: '',
+                                        });
+                                    }}
                                 >
-                                    <Text style={styles.cancelButtonText}>Отмена</Text>
+                                    <Text style={styles.cancelButtonText}>Cancel</Text>
                                 </TouchableOpacity>
 
                                 <TouchableOpacity
                                     style={[styles.button, styles.createButton]}
+                                    onPress={handleCreateBot}
+                                    disabled={isCreating}
                                 >
-                                    <Text style={styles.createButtonText}>Создать</Text>
+                                    {isCreating ? (
+                                        <ActivityIndicator size="small" color="#fff" />
+                                    ) : (
+                                        <Text style={styles.createButtonText}>Create</Text>
+                                    )}
                                 </TouchableOpacity>
                             </View>
                         </ScrollView>
@@ -211,6 +319,9 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: 'bold',
         color: '#000',
+    },
+    deleteButton: {
+        padding: 8,
     },
     botDetails: {
         marginTop: 4,
@@ -295,5 +406,15 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 16,
         fontWeight: '500',
+    },
+    centerContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    errorText: {
+        color: '#f4511e',
+        fontSize: 16,
+        textAlign: 'center',
     },
 });

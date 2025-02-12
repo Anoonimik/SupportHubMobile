@@ -1,54 +1,64 @@
-import { View, StyleSheet, FlatList, KeyboardAvoidingView, Platform } from 'react-native';
+import {View, StyleSheet, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator} from 'react-native';
 import { MessageBubble } from '@/components/chat/MessageBubble';
 import { MessageInput } from '@/components/chat/MessageInput';
 import { Message } from '@/types/chat';
-import { useState, useEffect } from 'react';
 import { useLocalSearchParams, useNavigation } from 'expo-router';
+import {useGetConversationByIdQuery, useSendMessageMutation} from "@/store/api/emailApi";
+import {useState} from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function ChatDetailScreen() {
     const { id } = useLocalSearchParams();
-    const navigation = useNavigation();
-    const [messages, setMessages] = useState<Message[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
-
-    useEffect(() => {
-        // В будущем здесь будет загрузка истории сообщений
-        loadInitialMessages();
-    }, [id]);
-
-    const loadInitialMessages = () => {
-        const initialMessage: Message = {
-            id: Date.now().toString(),
-            text: `Welcome to chat #${id}! How can I help you today?`,
-            sender: 'bot',
-            timestamp: new Date().toISOString(),
-        };
-        setMessages([initialMessage]);
-    };
+    const [companyName, setCompanyName] = useState<string | null>(null);
+    AsyncStorage.getItem('company_name').then(name => {
+        if (name) setCompanyName(name);
+    });
+    const { data: conversation, isLoading } = useGetConversationByIdQuery({
+        companyName: companyName,
+        id: parseInt(id as string),
+    });
+    const [sendMessage] = useSendMessageMutation();
 
     const handleSendMessage = async (text: string) => {
-        const newMessage: Message = {
-            id: Date.now().toString(),
-            text,
-            sender: 'user',
-            timestamp: new Date().toISOString(),
-        };
+        console.log('1. Начало отправки:', {
+            id,
+            emailRequesterId: conversation?.emailRequesterId,
+            text
+        });
 
-        setMessages(prev => [...prev, newMessage]);
-        setIsLoading(true);
-
-        // Имитация ответа от бота
-        setTimeout(() => {
-            const botMessage: Message = {
-                id: (Date.now() + 1).toString(),
-                text: `This is a response in chat #${id}`,
-                sender: 'bot',
-                timestamp: new Date().toISOString(),
-            };
-            setMessages(prev => [...prev, botMessage]);
-            setIsLoading(false);
-        }, 1000);
+        try {
+            console.log('2. Перед sendMessage');
+            await sendMessage({
+                companyName: companyName,
+                data: {
+                    emailConversationId: parseInt(id as string),
+                    emailRequesterId: conversation?.emailRequesterId || 0,
+                    body: text,
+                }
+            }).unwrap();
+        } catch (error) {
+            console.error('4. Ошибка при отправке:', error);
+        }
+        console.log('5. Завершение handleSendMessage');
     };
+    if (isLoading) {
+        return (
+            <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#f4511e" />
+            </View>
+        );
+    }
+
+    const renderMessage = ({ item }: { item: Message }) => (
+        <MessageBubble
+            message={{
+                id: item.messageId,
+                body: item.body,
+                userId: item.userId,
+                date: item.date,
+            }}
+        />
+    );
 
     return (
         <KeyboardAvoidingView
@@ -57,13 +67,13 @@ export default function ChatDetailScreen() {
             keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
         >
             <FlatList
-                data={messages}
-                renderItem={({ item }) => <MessageBubble message={item} />}
-                keyExtractor={item => item.id}
+                data={conversation?.messages}
+                renderItem={renderMessage}
+                keyExtractor={item => item.messageId}
                 contentContainerStyle={styles.messagesList}
                 inverted={false}
             />
-            <MessageInput onSend={handleSendMessage} isLoading={isLoading} />
+            <MessageInput onSend={handleSendMessage} isLoading={false} />
         </KeyboardAvoidingView>
     );
 }
@@ -76,5 +86,11 @@ const styles = StyleSheet.create({
     messagesList: {
         flexGrow: 1,
         padding: 16,
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#fff',
     },
 });

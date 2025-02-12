@@ -1,21 +1,36 @@
-import { View, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+// components/chat/MessageInput.tsx
+import { View, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 
 interface MessageInputProps {
-    onSend: (message: string) => void;
-    isLoading?: boolean;
+    onSend: (message: string) => Promise<void>;
 }
 
-export function MessageInput({ onSend, isLoading }: MessageInputProps) {
+export function MessageInput({ onSend }: MessageInputProps) {
     const [message, setMessage] = useState('');
+    const [isSending, setIsSending] = useState(false);
 
-    const handleSend = () => {
-        if (message.trim() && !isLoading) {
-            onSend(message.trim());
-            setMessage('');
+    const handleSend = useCallback(async () => {
+        if (!message.trim() || isSending) return;
+
+        setIsSending(true);
+
+        const messageToSend = message.trim();
+        setMessage('');
+
+        try {
+
+            await onSend(messageToSend);
+
+        } catch (error) {
+
+            setMessage(messageToSend);
+        } finally {
+            console.log('6. Завершение отправки');
+            setIsSending(false);
         }
-    };
+    }, [message, isSending, onSend]);
 
     return (
         <View style={styles.container}>
@@ -24,20 +39,24 @@ export function MessageInput({ onSend, isLoading }: MessageInputProps) {
                 value={message}
                 onChangeText={setMessage}
                 placeholder="Type a message..."
-                multiline
+                multiline={false} // Изменили на false
                 maxLength={1000}
-                editable={!isLoading}
+                editable={!isSending}
             />
             <TouchableOpacity
-                style={[styles.button, (!message.trim() || isLoading) && styles.buttonDisabled]}
+                style={[styles.button, (!message.trim() || isSending) && styles.buttonDisabled]}
                 onPress={handleSend}
-                disabled={!message.trim() || isLoading}
+                disabled={!message.trim() || isSending}
             >
-                <Feather
-                    name={isLoading ? "loader" : "send"}
-                    size={24}
-                    color={!message.trim() || isLoading ? '#999' : '#f4511e'}
-                />
+                {isSending ? (
+                    <ActivityIndicator size="small" color="#f4511e" />
+                ) : (
+                    <Feather
+                        name="send"
+                        size={24}
+                        color={!message.trim() || isSending ? '#999' : '#f4511e'}
+                    />
+                )}
             </TouchableOpacity>
         </View>
     );
@@ -54,8 +73,7 @@ const styles = StyleSheet.create({
     },
     input: {
         flex: 1,
-        minHeight: 40,
-        maxHeight: 100,
+        height: 40, // Фиксированная высота
         backgroundColor: '#f8f8f8',
         borderRadius: 20,
         paddingHorizontal: 16,

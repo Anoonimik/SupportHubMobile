@@ -44,8 +44,8 @@ export default function Register() {
 
             dispatch(setCredentials({
                 user: userData,
-                token: userData.token,
-                companyUrl: userData.companyName
+                token: userData.accessToken,
+                companyName: userData.companyName
             }));
 
             router.replace('/(app)/home');

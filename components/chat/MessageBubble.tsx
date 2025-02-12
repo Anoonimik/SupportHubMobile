@@ -2,11 +2,16 @@ import { View, Text, StyleSheet } from 'react-native';
 import { Message } from '@/types/chat';
 
 interface MessageBubbleProps {
-    message: Message;
+    message: {
+        id: string;
+        body: string;
+        userId: number | null;
+        date: string;
+    };
 }
 
 export function MessageBubble({ message }: MessageBubbleProps) {
-    const isUser = message.sender === 'user';
+    const isUser = message.userId !== null;
 
     return (
         <View style={[
@@ -21,10 +26,10 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                     styles.text,
                     isUser ? styles.userText : styles.botText
                 ]}>
-                    {message.text}
+                    {message.body}
                 </Text>
                 <Text style={styles.timestamp}>
-                    {new Date(message.timestamp).toLocaleTimeString([], {
+                    {new Date(message.date).toLocaleTimeString([], {
                         hour: '2-digit',
                         minute: '2-digit'
                     })}

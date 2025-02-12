@@ -14,4 +14,6 @@ export const baseApi = createApi({
         },
     }),
     endpoints: () => ({}),
+    tagTypes: ['Conversations', 'Conversation'] as const,
+
 });

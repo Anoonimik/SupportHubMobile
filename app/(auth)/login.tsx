@@ -22,17 +22,16 @@ export default function Login() {
                 password,
                 companyUrl: companyUrl.toLowerCase().trim()
             }).unwrap();
-
             dispatch(setCredentials({
                 user: userData,
-                token: userData.token,
-                companyName: userData.companyUrl
+                token: userData.accessToken,
+                companyName: companyUrl.toLowerCase().trim()
             }));
+
             router.replace('/(app)/home');
             try {
                 await Updates.reloadAsync();
             } catch (err) {
-                console.log('Error reloading app:', err);
             }
         } catch (error) {
             console.error('Failed to login:', error);
