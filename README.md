@@ -20,9 +20,9 @@
     npx run start
    ```
 3. Run Api if you want to run the application locally:
-```
+
 https://github.com/tref01l-pr/SupportHub
-```
+
 In the output, you'll find options to open the app in a
 
 - [development build](https://docs.expo.dev/develop/development-builds/introduction/)
